@@ -1,0 +1,320 @@
+version: '3.7'
+
+services:
+  rabbit:
+    image: "rabbitmq:3.6.14-management-alpine"
+    environment:
+      RABBITMQ_ERLANG_COOKIE: "BOOOOOOOOOOOOOOOOOOO"
+      RABBITMQ_DEFAULT_USER: "docker"
+      RABBITMQ_DEFAULT_PASS: "docker"
+      RABBITMQ_DEFAULT_VHOST: "/"
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+      - "5671:5671"
+    volumes:
+      - ./rabbit/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh
+      - ./rabbit/initialize.sh:/initialize.sh
+      - ./rabbit/enabled_plugins:/etc/rabbitmq/enabled_plugins
+      - ./rabbit/rabbitmq.config:/etc/rabbitmq/rabbitmq.config:ro
+      - ./volumes/rabbit:/var/lib/rabbitmq:rw
+
+  sentry:
+    image: sentry:9.1
+    ports:
+     - 9000:9000
+    environment:
+      SENTRY_REDIS_HOST: redis
+      SENTRY_POSTGRES_HOST: postgres
+      SENTRY_SECRET_KEY: fe681f0e668df608e2028cd9b03fbde674aea65165b626ce64e6f75ba17c098797cb769402abf88fcd8823bd4a20da615235e8872e8fcbb09db13017c0008ded
+      SENTRY_DB_NAME: sentry
+      SENTRY_DB_USER: docker
+      SENTRY_DB_PASSWORD: docker
+    command: "/run_sentry.sh"
+    volumes:
+      - ./sentry/bootstrap.py:/bootstrap.py
+      - ./sentry/create_db.py:/create_db.py
+      - ./sentry/run_sentry.sh:/run_sentry.sh
+    depends_on:
+      - redis
+      - postgres
+
+  postgres:
+    image: postgres:12
+    shm_size: 2g
+    ports:
+      - 5432:5432
+    volumes:
+      - ./volumes/logs/postgres-12:/var/log/postgresql/:rw
+      - ./volumes/postgres/data-12:/var/lib/postgresql/data:rw
+    environment:
+      POSTGRES_PASSWORD: docker
+      POSTGRES_USER: docker
+      POSTGRES_DBUSER: docker
+      POSTGRES_DBPASS: docker
+
+  pgadmin4:
+    image: dpage/pgadmin4:5.5
+    environment:
+      PGADMIN_DEFAULT_EMAIL: docker@docker.com
+      PGADMIN_DEFAULT_PASSWORD: docker
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    volumes:
+      - ./volumes/pgadmin/servers.json:/pgadmin4/servers.json:rw
+      - ./volumes/pgadmin/pgpassfile:/pgpassfile:rw
+    ports:
+      - 25432:80
+    depends_on:
+      - postgres
+
+  redis:
+    image: redis:6
+    command: "redis-server /etc/redis/redis.conf"
+    ports:
+      - 6379:6379
+    volumes:
+      - ./volumes/logs:/logs:rw
+      - ./volumes/redis:/etc/redis/data:rw
+      - ./redis/redis.conf:/etc/redis/redis.conf
+
+  influxdb:
+    image: influxdb:1.8.6-alpine
+    ports:
+      - 8086:8086
+    environment:
+      - INFLUXDB_DATA_MAX_VALUES_PER_TAG=0
+    volumes:
+      - ./volumes/influx/influx.config:/root/influxdb/influxdb.conf
+      - ./volumes/influxdb:/var/lib/influxdb:rw
+  influxdb_alt:
+    image: influxdb:1.8.6-alpine
+    ports:
+      - 8087:8086
+    environment:
+      - INFLUXDB_DATA_MAX_VALUES_PER_TAG=0
+    volumes:
+      - ./volumes/influx/influx.config:/root/influxdb/influxdb.conf:ro
+      - ./volumes/influxdb_alt:/var/lib/influxdb:rw
+
+
+  stats:
+    image: stats_service
+    depends_on:
+      - influxdb
+      - rabbit
+      - sentry
+    env_file:
+      - global.env
+    volumes:
+      - ./volumes/logs/stats:/usr/src/app/log
+
+  notification:
+    image: notification_service  # hay que buildearla antes
+    env_file:
+      - global.env
+    environment:
+      DB_NAME: notification_service_production
+    depends_on:
+      - sentry
+      - rabbit
+      - postgres
+    volumes:
+      - ./volumes/logs/notifications:/usr/src/app/log
+
+  afip_service_sync:
+    image: afip_service
+    env_file:
+      - global.env
+    environment:
+      DB_NAME: afip_service
+    depends_on:
+      - sentry
+      - rabbit
+      - postgres
+    volumes:
+      - ./volumes/logs/afip:/usr/src/app/log
+
+  afip_service_async:
+    image: afip_service
+    env_file:
+      - global.env
+    environment:
+      DB_NAME: afip_service
+    command: "rake consume -- -m async"
+    depends_on:
+      - sentry
+      - rabbit
+      - postgres
+    volumes:
+      - ./volumes/logs/afip:/usr/src/app/log
+
+  maria:
+    image: mariadb:10
+    ports:
+      - 3306:3306
+    volumes:
+      - ./volumes/logs/mariadb:/var/log/:rw
+      - ./volumes/mariadb/:/var/lib/mysql/:rw
+    environment:
+      MYSQL_ROOT_PASSWORD: docker
+      MYSQL_USER: docker
+      MYSQL_PASSWORD: docker
+      MYSQL_DATABASE: docker
+
+  postgresql-master:
+    image: bitnami/postgresql:12
+    ports:
+      - 15432:5432
+    volumes:
+      - ./volumes/pg-master:/bitnami/postgresql:rw
+      # - ./volumes/pg-master/postgresql.conf:/opt/bitnami/postgresql/conf/postgresql.conf
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=master
+      - POSTGRESQL_REPLICATION_USER=docker_r
+      - POSTGRESQL_REPLICATION_PASSWORD=docker_r
+      - POSTGRESQL_USERNAME=docker
+      - POSTGRESQL_PASSWORD=docker
+      - POSTGRESQL_DATABASE=docker
+      - ALLOW_EMPTY_PASSWORD=yes
+      - POSTGRESQL_SYNCHRONOUS_COMMIT_MODE=remote_apply
+      - POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS=1
+      - BITNAMI_DEBUG=true
+      - POSTGRESQL_LOG_DIR=/bitnami/postgresql/logs
+  postgresql-slave:
+    image: bitnami/postgresql:12
+    ports:
+      - 15433:5432
+    depends_on:
+      - postgresql-master
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=slave
+      - POSTGRESQL_REPLICATION_USER=docker_r
+      - POSTGRESQL_REPLICATION_PASSWORD=docker_r
+      - POSTGRESQL_MASTER_HOST=postgresql-master
+      - POSTGRESQL_PASSWORD=docker
+      - POSTGRESQL_MASTER_PORT_NUMBER=5432
+      - ALLOW_EMPTY_PASSWORD=yes
+      - BITNAMI_DEBUG=true
+
+  routeros_6_44_3:
+    container_name: 'routeros_6_44_3'
+    image: evilfreelancer/docker-routeros:6.44.3
+    restart: unless-stopped
+    ports:
+      - "22222:22"   # ssh
+      - "22223:23"   # telnet
+      - "28728:8728" # api
+      - "28729:8729" # api-ssl
+      - "28291:8291" # winbox
+    networks:
+      mikrotik-net:
+        ipv4_address: 192.168.150.2
+
+  mongo:
+    image: mongo
+    restart: always
+    ports:
+      - 27017:27017
+
+  # Monitorear
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.39.2
+    privileged: true
+    ports:
+      - 8080:8080
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /cgroup:/cgroup:ro
+    networks:
+      - monitor-net
+
+  prometheus:
+    image: prom/prometheus:v2.27.1
+    volumes:
+      - ./volumes/prometheus:/etc/prometheus
+      - ./volumes/prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    ports:
+      - 9090:9090
+    networks:
+      - monitor-net
+
+  grafana:
+    image: grafana/grafana:8.0.3
+    container_name: grafana
+    volumes:
+      - ./volumes/grafana_data:/var/lib/grafana
+      - ./volumes/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./volumes/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_USER=${ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=true
+    restart: unless-stopped
+    ports:
+      - 8881:3000
+    networks:
+      - monitor-net
+
+  nodeexporter:
+    image: prom/node-exporter:v1.1.2
+    container_name: nodeexporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    ports:
+      - 9100:9100
+    networks:
+      - monitor-net
+
+  radicle:
+    # build: ./radicle
+    entrypoint: ''
+    command: "/radicle-data/startup.sh"
+    image: gcr.io/opensourcecoin/radicle-seed-node:10dad832ae8be40c66ef62a6626dd929b641c407
+    ports:
+      - 12345:12345/udp
+      - 8888:80
+    volumes:
+      - ./radicle/data:/radicle-data/
+      - ./radicle/cache:/cache/cargo
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 3000M
+
+  sqs:
+    image: roribio16/alpine-sqs:1.2.0
+    ports:
+      - 9324:9324
+      - 9325:9325
+    restart: unless-stopped
+
+networks:
+  monitor-net:
+    driver: bridge
+  mikrotik-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.150.0/24
