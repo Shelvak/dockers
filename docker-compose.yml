@@ -304,11 +304,13 @@ services:
           memory: 3000M
 
   sqs:
-    image: roribio16/alpine-sqs:1.2.0
+    image: softwaremill/elasticmq-native:1.3.3
     ports:
       - 9324:9324
       - 9325:9325
     restart: unless-stopped
+    volumes:
+      - ./volumes/sqs/elasticmq.conf:/opt/elasticmq.conf
 
 networks:
   monitor-net:
