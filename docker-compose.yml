@@ -14,8 +14,8 @@ services:
       - "5671:5671"
     volumes:
       - ./rabbit/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh
-      - ./rabbit/initialize.sh:/initialize.sh
       - ./rabbit/enabled_plugins:/etc/rabbitmq/enabled_plugins
+      - ./rabbit/initialize.sh:/initialize.sh
       - ./rabbit/rabbitmq.config:/etc/rabbitmq/rabbitmq.config:ro
       - ./volumes/rabbit:/var/lib/rabbitmq:rw
 
@@ -40,13 +40,13 @@ services:
       - postgres
 
   postgres:
-    image: postgres:12
+    image: postgres:16
     shm_size: 2g
     ports:
       - 5432:5432
     volumes:
-      - ./volumes/logs/postgres-12:/var/log/postgresql/:rw
-      - ./volumes/postgres/data-12:/var/lib/postgresql/data:rw
+      - ./volumes/logs/postgres-16:/var/log/postgresql/:rw
+      - ./volumes/postgres/data-16:/var/lib/postgresql/data:rw
     environment:
       POSTGRES_PASSWORD: docker
       POSTGRES_USER: docker
@@ -87,67 +87,6 @@ services:
     volumes:
       - ./volumes/influx/influx.config:/root/influxdb/influxdb.conf
       - ./volumes/influxdb:/var/lib/influxdb:rw
-  influxdb_alt:
-    image: influxdb:1.8.6-alpine
-    ports:
-      - 8087:8086
-    environment:
-      - INFLUXDB_DATA_MAX_VALUES_PER_TAG=0
-    volumes:
-      - ./volumes/influx/influx.config:/root/influxdb/influxdb.conf:ro
-      - ./volumes/influxdb_alt:/var/lib/influxdb:rw
-
-
-  stats:
-    image: stats_service
-    depends_on:
-      - influxdb
-      - rabbit
-      - sentry
-    env_file:
-      - global.env
-    volumes:
-      - ./volumes/logs/stats:/usr/src/app/log
-
-  notification:
-    image: notification_service  # hay que buildearla antes
-    env_file:
-      - global.env
-    environment:
-      DB_NAME: notification_service_production
-    depends_on:
-      - sentry
-      - rabbit
-      - postgres
-    volumes:
-      - ./volumes/logs/notifications:/usr/src/app/log
-
-  afip_service_sync:
-    image: afip_service
-    env_file:
-      - global.env
-    environment:
-      DB_NAME: afip_service
-    depends_on:
-      - sentry
-      - rabbit
-      - postgres
-    volumes:
-      - ./volumes/logs/afip:/usr/src/app/log
-
-  afip_service_async:
-    image: afip_service
-    env_file:
-      - global.env
-    environment:
-      DB_NAME: afip_service
-    command: "rake consume -- -m async"
-    depends_on:
-      - sentry
-      - rabbit
-      - postgres
-    volumes:
-      - ./volumes/logs/afip:/usr/src/app/log
 
   maria:
     image: mariadb:10
@@ -197,23 +136,9 @@ services:
       - ALLOW_EMPTY_PASSWORD=yes
       - BITNAMI_DEBUG=true
 
-  routeros_6_44_3:
-    container_name: 'routeros_6_44_3'
-    image: evilfreelancer/docker-routeros:6.44.3
-    restart: unless-stopped
-    ports:
-      - "22222:22"   # ssh
-      - "22223:23"   # telnet
-      - "28728:8728" # api
-      - "28729:8729" # api-ssl
-      - "28291:8291" # winbox
-    networks:
-      mikrotik-net:
-        ipv4_address: 192.168.150.2
-
   mongo:
     image: mongo
-    restart: always
+    # restart: unless-stopped
     ports:
       - 27017:27017
 
@@ -244,7 +169,7 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
-    restart: unless-stopped
+    # restart: unless-stopped
     ports:
       - 9090:9090
     networks:
@@ -261,7 +186,7 @@ services:
       - GF_SECURITY_ADMIN_USER=${ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=true
-    restart: unless-stopped
+    # restart: unless-stopped
     ports:
       - 8881:3000
     networks:
@@ -279,44 +204,83 @@ services:
       - '--path.rootfs=/rootfs'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
-    restart: unless-stopped
+    # restart: unless-stopped
     ports:
       - 9100:9100
     networks:
       - monitor-net
-
-  radicle:
-    # build: ./radicle
-    entrypoint: ''
-    command: "/radicle-data/startup.sh"
-    image: gcr.io/opensourcecoin/radicle-seed-node:10dad832ae8be40c66ef62a6626dd929b641c407
-    ports:
-      - 12345:12345/udp
-      - 8888:80
-    volumes:
-      - ./radicle/data:/radicle-data/
-      - ./radicle/cache:/cache/cargo
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 3000M
 
   sqs:
     image: softwaremill/elasticmq-native:1.3.3
     ports:
       - 9324:9324
       - 9325:9325
-    restart: unless-stopped
+    # restart: unless-stopped
     volumes:
       - ./volumes/sqs/elasticmq.conf:/opt/elasticmq.conf
+
+  motioneye:
+    container_name: motioneye
+    image: ccrisan/motioneye:master-amd64  # Change to ccrisan/motioneye:master-armhf for ARM chips (Pi etc.)
+    ports:
+      - "8081:8081"
+      - "8765:8765"
+    volumes:
+      - ./volumes/camera/etc:/etc/motioneye
+      - ./volumes/camera/data:/var/lib/motioneye
+    restart: unless-stopped
+    cpus: 16
+    mem_limit: 6g
+
+  flexget:
+    image: flexget/flexget:3.7.8
+    container_name: flexget
+    command:
+      - daemon
+      - start
+      - --autoreload-config
+    volumes:
+      - ./volumes/Torrents/.flexget:/config
+    environment:
+      - PUID=1000
+      - GUID=1000
+      - USERID=1000
+      - GROUPID=1000
+    cpus: 4
+    mem_limit: 1g
+    restart: unless-stopped
+
+  transmission:
+    image: linuxserver/transmission:4.0.3
+    container_name: transmission
+    env_file:
+      - ./volumes/Torrents/.transmission-daemon/.env
+    volumes:
+      - ./volumes/Torrents/.transmission-daemon:/config
+      - ./volumes/Torrents:/Torrents
+      - ./volumes/common:/common:ro
+    ports:
+      - 9091:9091
+      - 51412:51412
+      - 51412:51412/udp
+    restart: unless-stopped
+
+  samba:
+    image: dperson/samba
+    container_name: samba
+    command: '-p -s "public;/mount;yes;no;yes"'
+    environment:
+      - USERID=1000
+      - GROUPID=1000
+    ports:
+      - "137:137/udp"
+      - "138:138/udp"
+      - "139:139/tcp"
+      - "445:445/tcp"
+    volumes:
+      - ./volumes/Torrents:/mount:rw
+    restart: unless-stopped
 
 networks:
   monitor-net:
     driver: bridge
-  mikrotik-net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 192.168.150.0/24
