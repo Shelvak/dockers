@@ -249,6 +249,11 @@ services:
     cpus: 4
     mem_limit: 1g
     restart: unless-stopped
+    healthcheck:
+      test: 'if [[ "$(flexget daemon status)" == *"Daemon running"* ]]; then echo 0; else (rm /config/.config-lock && echo 1); fi'
+      interval: 10m
+      timeout: 5s
+      retries: 50
 
   transmission:
     image: linuxserver/transmission:4.0.3
@@ -280,6 +285,15 @@ services:
     volumes:
       - ./volumes/Torrents:/mount:rw
     restart: unless-stopped
+
+  jdown:
+    image: jlesage/jdownloader-2
+    container_name: jdownloader
+    ports:
+      - 5800:5800
+    volumes:
+      - ./volumes/jdownloader:/config:rw
+      - ./volumes/Downloads:/output:rw
 
 networks:
   monitor-net:

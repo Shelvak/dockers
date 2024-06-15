@@ -52,6 +52,9 @@ docker-compose up   # Will take a few to run all the migrations
 - `./volumes/Torrents/.transmission-daemon` lives transmission folder
 - `./volumes/Torrents/.flexget` lives flexget config
 
+### JDownloader
+- Must link/create `./volumes/Downloads/` for downloads
+
 # Running containers
 After the setup you'll only have to run `docker-compose up [-d]` # -d is for dettached mode (background)
 
