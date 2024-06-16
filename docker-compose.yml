@@ -295,6 +295,17 @@ services:
       - ./volumes/jdownloader:/config:rw
       - ./volumes/Downloads:/output:rw
 
+  manjaro-mirror:
+    image: nginx:1.27
+    volumes:
+      - ./volumes/manjaro-mirror:/usr/share/nginx/html:ro
+    environment:
+      ALLOW_ORIGIN: '*'
+      NGINX_HOST: '0.0.0.0:55555'
+    ports:
+      - 55555:80
+    restart: unless-stopped
+
 networks:
   monitor-net:
     driver: bridge
