@@ -1,5 +1,3 @@
-version: '3.7'
-
 services:
   rabbit:
     image: "rabbitmq:3.6.14-management-alpine"
@@ -233,7 +231,7 @@ services:
     mem_limit: 6g
 
   flexget:
-    image: flexget/flexget:3.7.8
+    image: flexget/flexget:3.11
     container_name: flexget
     command:
       - daemon
@@ -241,6 +239,7 @@ services:
       - --autoreload-config
     volumes:
       - ./volumes/Torrents/.flexget:/config
+      - ./volumes/Torrents:/Torrents
     environment:
       - PUID=1000
       - GUID=1000
