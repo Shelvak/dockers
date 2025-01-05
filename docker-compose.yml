@@ -305,6 +305,20 @@ services:
       - 55555:80
     restart: unless-stopped
 
+  siyuan:
+    image: b3log/siyuan
+    command: ['--workspace=/siyuan/workspace/', '--accessAuthCode=123qweasd']
+    ports:
+      - 6806:6806
+    volumes:
+      - ./volumes/siyuan:/siyuan/workspace
+    restart: unless-stopped
+    environment:
+      # A list of time zone identifiers can be found at https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+      - TZ="Argentina/Buenos_Aires"
+      - PUID=1000
+      - PGID=1000
+
 networks:
   monitor-net:
     driver: bridge
