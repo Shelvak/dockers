@@ -319,6 +319,37 @@ services:
       - PUID=1000
       - PGID=1000
 
+  stirling-pdf:
+    image: stirlingtools/stirling-pdf:latest
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./volumes/StirlingPDF/trainingData:/usr/share/tessdata # Required for extra OCR languages
+      - ./volumes/StirlingPDF/extraConfigs:/configs
+      - ./volumes/StirlingPDF/customFiles:/customFiles/
+      - ./volumes/StirlingPDF/logs:/logs/
+      - ./volumes/StirlingPDF/pipeline:/pipeline/
+    environment:
+      - DOCKER_ENABLE_SECURITY=false
+      - INSTALL_BOOK_AND_ADVANCED_HTML_OPS=false
+      - LANGS=en_GB
+
+  ollama:
+    image: ollama/ollama
+    ports:
+      - '11434:11434'
+    volumes:
+      - ./volumes/ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+
+
+
 networks:
   monitor-net:
     driver: bridge
