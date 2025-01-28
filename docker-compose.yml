@@ -1,3 +1,12 @@
+x-gpu-enable: &gpu-enabled
+  resources:
+    reservations:
+      devices:
+      - driver: nvidia
+        count: 1
+        capabilities: [gpu]
+
+
 services:
   rabbit:
     image: "rabbitmq:3.6.14-management-alpine"
@@ -341,14 +350,16 @@ services:
     volumes:
       - ./volumes/ollama:/root/.ollama
     deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            count: 1
-            capabilities: [gpu]
+      <<: *gpu-enabled
 
-
+  ebook2audio:
+    image: athomasson2/ebook2audiobook
+    platform: linux/amd64
+    command: python app.py
+    ports:
+      - 7860:7860
+    deploy:
+      <<: *gpu-enabled
 
 networks:
   monitor-net:
