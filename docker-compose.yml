@@ -165,7 +165,7 @@ services:
       - monitor-net
 
   prometheus:
-    image: prom/prometheus:v2.27.1
+    image: prom/prometheus:latest
     volumes:
       - ./volumes/prometheus:/etc/prometheus
       - ./volumes/prometheus_data:/prometheus
@@ -183,7 +183,7 @@ services:
       - monitor-net
 
   grafana:
-    image: grafana/grafana:8.0.3
+    image: grafana/grafana:latest
     container_name: grafana
     volumes:
       - ./volumes/grafana_data:/var/lib/grafana
@@ -200,7 +200,7 @@ services:
       - monitor-net
 
   nodeexporter:
-    image: prom/node-exporter:v1.1.2
+    image: prom/node-exporter:latest
     container_name: nodeexporter
     volumes:
       - /proc:/host/proc:ro
