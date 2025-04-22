@@ -355,11 +355,25 @@ services:
   ebook2audio:
     image: athomasson2/ebook2audiobook
     platform: linux/amd64
-    command: python app.py
+    # command: python app.py
     ports:
       - 7860:7860
     deploy:
       <<: *gpu-enabled
+
+  cursor:
+    build:
+      context: ./cursor
+      args:
+        DUMMY: $DUMMY_DATE
+    container_name: cursor
+    volumes:
+      - ./volumes/cursor:/home/cursor/.cursor
+      - ./volumes/cursor-config:/home/cursor/.config
+      - ./volumes/git:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    environment:
+      - DISPLAY=$DISPLAY
 
 networks:
   monitor-net:
