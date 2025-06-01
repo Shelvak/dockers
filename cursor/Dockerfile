@@ -9,6 +9,9 @@ ARG USER_GID=1000
 # Avoid prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
+RUN apt-get update && apt-get install -y software-properties-common && \
+    add-apt-repository ppa:rabbitmq/rabbitmq-erlang
+
 # Install dependencies for Cursor and X11 forwarding
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Utilities
@@ -29,6 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     # Fonts (important for GUI rendering)
     fonts-liberation \
+    elixir erlang curl \
     # Clean up APT cache
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -59,4 +63,7 @@ WORKDIR /home/$USERNAME
 
 # Default command to launch Cursor
 # --no-sandbox is often required when running in containers
-CMD ["cursor", "--no-sandbox"]
+# --disable-dev-shm-usage is to avoid issues with shared memory in containers [Avoid resizing crash]
+CMD ["cursor", "--no-sandbox", "--disable-dev-shm-usage"]
+## Possible flags to avoid crashing
+#"--disable-gpu-compositing" , "--disable-gpu", "--disable-software-rasterizer", "--enable-features=UseOzonePlatform", "--ozone-platform=x11"
