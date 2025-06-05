@@ -103,10 +103,10 @@ services:
       - ./volumes/logs/mariadb:/var/log/:rw
       - ./volumes/mariadb/:/var/lib/mysql/:rw
     environment:
-      MYSQL_ROOT_PASSWORD: docker
-      MYSQL_USER: docker
-      MYSQL_PASSWORD: docker
-      MYSQL_DATABASE: docker
+      MARIADB_USER: docker
+      MARIADB_PASSWORD: docker
+      MARIADB_DATABASE: docker
+      MARIADB_ROOT_PASSWORD: docker
 
   postgresql-master:
     image: bitnami/postgresql:12
@@ -360,7 +360,6 @@ services:
       - 7860:7860
     deploy:
       <<: *gpu-enabled
-
   cursor:
     build:
       context: ./cursor

@@ -34,6 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     elixir erlang curl \
     python3.12-venv \
+    bash \
     # Clean up APT cache
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -62,8 +63,8 @@ RUN wget -qO- --no-check-certificate "https://www.cursor.com/api/download?platfo
 USER $USERNAME
 WORKDIR /home/$USERNAME
 
-RUN wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-RUN source ~/.nvm/nvm.sh && nvm install 23.11
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+RUN /bin/bash -c "source ~/.nvm/nvm.sh && nvm install 23.11 && nvm alias default 23.11 && nvm use default"
 
 RUN python3 -m venv ~/.venv
 
