@@ -33,6 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Fonts (important for GUI rendering)
     fonts-liberation \
     elixir erlang curl \
+    python3.12-venv \
     # Clean up APT cache
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -60,6 +61,11 @@ RUN wget -qO- --no-check-certificate "https://www.cursor.com/api/download?platfo
 # Switch to the non-root user
 USER $USERNAME
 WORKDIR /home/$USERNAME
+
+RUN wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+RUN source ~/.nvm/nvm.sh && nvm install 23.11
+
+RUN python3 -m venv ~/.venv
 
 # Default command to launch Cursor
 # --no-sandbox is often required when running in containers
